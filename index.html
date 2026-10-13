@@ -1,19 +1,475 @@
 <!doctype html>
-<html>
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width" />
-		<title>My static Space</title>
-		<link rel="stylesheet" href="style.css" />
-	</head>
-	<body>
-		<div class="card">
-			<h1>Welcome to your static Space!</h1>
-			<p>You can modify this app directly by editing <i>index.html</i> in the Files and versions tab.</p>
-			<p>
-				Also don't forget to check the
-				<a href="https://huggingface.co/docs/hub/spaces" target="_blank">Spaces documentation</a>.
-			</p>
-		</div>
-	</body>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Multi-Channel Analytics Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body>
+    <div class="app-layout">
+      <!-- LEFT SIDEBAR: CHANNEL SWITCHER -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-logo">
+            <i data-lucide="youtube" class="brand-icon"></i>
+          </div>
+          <div class="brand-info">
+            <h2>YT Analytics Hub</h2>
+            <span class="badge-read-only"
+              ><i data-lucide="shield-check"></i> Read-Only Mode</span
+            >
+          </div>
+        </div>
+
+        <div class="sidebar-section-title">
+          <span>KÊNH QUẢN LÝ (ĐỘC LẬP)</span>
+        </div>
+
+        <!-- Channel Switcher List -->
+        <div class="channel-list" id="channelList">
+          <!-- Rendered dynamically by JS -->
+        </div>
+
+        <button class="btn-add-channel" id="btnAddChannel">
+          <i data-lucide="plus-circle"></i>
+          <span>Thêm kênh liên kết</span>
+        </button>
+
+        <div class="sidebar-footer">
+          <div class="status-indicator">
+            <span class="pulse-dot"></span>
+            <span>Google API: Đã kết nối</span>
+          </div>
+          <small>Dữ liệu cô lập 100% theo kênh</small>
+        </div>
+      </aside>
+
+      <!-- MAIN WORKSPACE (FULL WIDTH FLUID) -->
+      <main class="main-workspace">
+        <!-- TOP NAV BAR -->
+        <header class="top-nav">
+          <div class="active-channel-header">
+            <div class="avatar-ring">
+              <img
+                id="activeChannelAvatar"
+                src=""
+                alt="Avatar"
+                class="header-avatar"
+              />
+            </div>
+            <div>
+              <div class="title-with-badge">
+                <h1 id="activeChannelName">Đang tải...</h1>
+                <span class="channel-handle" id="activeChannelHandle"
+                  >@handle</span
+                >
+                <span class="status-pill"
+                  ><i data-lucide="check-circle-2"></i> Đang hoạt động</span
+                >
+              </div>
+              <p class="channel-desc" id="activeChannelTopic">Chủ đề kênh</p>
+            </div>
+          </div>
+
+          <div class="top-nav-actions">
+            <div class="sync-info">
+              <i data-lucide="cloud-check"></i>
+              <span id="lastSyncedText">Đồng bộ: Vừa xong</span>
+            </div>
+            <button
+              class="btn-refresh"
+              id="btnRefresh"
+              title="Làm mới số liệu từ YouTube API"
+            >
+              <i data-lucide="refresh-cw"></i>
+              <span>Đồng bộ lại</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- CHANNEL BENCHMARK CARDS -->
+        <section class="benchmark-section">
+          <div class="benchmark-header">
+            <div class="benchmark-title-group">
+              <div class="icon-circle"><i data-lucide="compass"></i></div>
+              <div>
+                <h3>Hệ quy chiếu chuẩn của riêng kênh (28 ngày qua)</h3>
+                <p>
+                  Mỗi video của kênh được so sánh với các chỉ số trung bình này
+                  để đo lường độ hiệu quả
+                </p>
+              </div>
+            </div>
+            <span class="badge-period"
+              ><i data-lucide="calendar"></i> 28 ngày gần nhất</span
+            >
+          </div>
+
+          <div class="benchmark-grid">
+            <div class="benchmark-card card-cyan">
+              <div class="benchmark-card-inner">
+                <div class="card-top">
+                  <span class="label">Người đăng ký (Subscribers)</span>
+                  <div class="icon-box"><i data-lucide="users"></i></div>
+                </div>
+                <div class="value-row">
+                  <span class="value" id="bmSubs">--</span>
+                  <span class="trend up" id="bmSubsTrend">+0</span>
+                </div>
+                <div class="card-footer-info">Tổng quy mô người theo dõi</div>
+              </div>
+            </div>
+
+            <div class="benchmark-card card-purple">
+              <div class="benchmark-card-inner">
+                <div class="card-top">
+                  <span class="label">Tổng lượt xem (28 ngày)</span>
+                  <div class="icon-box"><i data-lucide="eye"></i></div>
+                </div>
+                <div class="value-row">
+                  <span class="value" id="bmViews">--</span>
+                  <span class="trend up" id="bmViewsTrend">+0%</span>
+                </div>
+                <div class="card-footer-info">
+                  Lượng view tích lũy tháng này
+                </div>
+              </div>
+            </div>
+
+            <div class="benchmark-card card-red highlight-card">
+              <div class="benchmark-card-inner">
+                <div class="card-top">
+                  <span class="label">CTR Trung Bình Kênh (Chuẩn nhấp)</span>
+                  <div class="icon-box">
+                    <i data-lucide="mouse-pointer-click"></i>
+                  </div>
+                </div>
+                <div class="value-row">
+                  <span class="value" id="bmAvgCtr">--%</span>
+                  <span class="target-tag"
+                    >Mục tiêu &gt;
+                    <strong id="bmAvgCtrTarget">--%</strong></span
+                  >
+                </div>
+                <div class="card-footer-info">
+                  Thước đo sức hút Thumbnail & Tiêu đề
+                </div>
+              </div>
+            </div>
+
+            <div class="benchmark-card card-emerald highlight-card">
+              <div class="benchmark-card-inner">
+                <div class="card-top">
+                  <span class="label">Tỷ lệ Giữ Chân TB (Retention)</span>
+                  <div class="icon-box"><i data-lucide="activity"></i></div>
+                </div>
+                <div class="value-row">
+                  <span class="value" id="bmAvgRetention">--%</span>
+                  <span class="target-tag"
+                    >Mục tiêu &gt;
+                    <strong id="bmAvgRetentionTarget">--%</strong></span
+                  >
+                </div>
+                <div class="card-footer-info">
+                  Thước đo chất lượng nội dung video
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIDEO EXPLORER & MANAGEMENT -->
+        <section class="video-explorer-section">
+          <!-- Controls & Filter Bar -->
+          <div class="controls-bar">
+            <div class="search-box">
+              <i data-lucide="search" class="search-icon"></i>
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="Tìm kiếm nhanh theo tiêu đề video hoặc thẻ tag (nhấn Enter để lọc)..."
+              />
+              <kbd class="kbd-hint">Ctrl K</kbd>
+            </div>
+
+            <div class="filters-group">
+              <div class="btn-group-format" id="formatFilters">
+                <button class="filter-btn active" data-format="all">
+                  Tất cả video
+                </button>
+                <button class="filter-btn" data-format="long">
+                  <i data-lucide="play-circle"></i> Video dài
+                </button>
+                <button class="filter-btn" data-format="shorts">
+                  <i data-lucide="zap"></i> Shorts
+                </button>
+              </div>
+
+              <div class="select-wrapper">
+                <i data-lucide="arrow-down-up" class="select-icon"></i>
+                <select id="sortSelect">
+                  <option value="recent">Sắp xếp: Mới nhất</option>
+                  <option value="views">Lượt xem nhiều nhất</option>
+                  <option value="ctr">Tỉ lệ Click (CTR) cao nhất</option>
+                  <option value="retention">Giữ chân người xem tốt nhất</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Count & Meta Info -->
+          <div class="video-status-bar">
+            <div class="count-pill">
+              <span class="live-indicator"></span>
+              <span id="videoCountText">Đang hiển thị 0 video</span>
+            </div>
+            <span class="hint-text">
+              <i data-lucide="sparkles"></i> Nhấp vào bất kỳ video nào để mở
+              bảng phân tích chuyên sâu
+            </span>
+          </div>
+
+          <!-- Video Grid List (Fluid & Responsive) -->
+          <div class="video-grid" id="videoGrid">
+            <!-- Rendered dynamically -->
+          </div>
+        </section>
+      </main>
+
+      <!-- CENTERED CINEMA MODAL (DEEP-DIVE VIDEO INSPECTOR) -->
+      <div class="modal-backdrop" id="modalBackdrop">
+        <div
+          class="modal-dialog"
+          id="modalDialog"
+          role="dialog"
+          aria-modal="true"
+        >
+          <!-- Modal Top Bar -->
+          <div class="modal-header">
+            <div class="modal-header-left">
+              <span class="modal-badge"
+                ><i data-lucide="bar-chart-3"></i> PHÂN TÍCH CHUYÊN SÂU
+                VIDEO</span
+              >
+              <h2 id="insTitle" class="modal-title">Tiêu đề video</h2>
+            </div>
+            <button
+              class="btn-close-modal"
+              id="btnCloseModal"
+              title="Đóng bảng phân tích (ESC)"
+            >
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+
+          <!-- Modal Scrollable Content -->
+          <div class="modal-body" id="modalBody">
+            <!-- Row 1: Video Hero Info & Diagnosis Banner -->
+            <div class="modal-hero-grid">
+              <div class="modal-thumb-box">
+                <img id="insThumb" src="" alt="Thumbnail" class="modal-thumb" />
+                <span class="thumb-duration-pill" id="insDuration">00:00</span>
+                <span class="thumb-format-pill" id="insTypeBadge"
+                  >Video dài</span
+                >
+              </div>
+
+              <div class="modal-hero-details">
+                <div class="specs-grid">
+                  <div class="spec-item">
+                    <span class="spec-label">Ngày xuất bản</span>
+                    <span class="spec-val" id="insPublishDate">--</span>
+                  </div>
+                  <div class="spec-item">
+                    <span class="spec-label">Trạng thái</span>
+                    <span class="spec-val text-green" id="insStatus"
+                      ><i data-lucide="globe"></i> Công khai</span
+                    >
+                  </div>
+                  <div class="spec-item">
+                    <span class="spec-label">Danh mục</span>
+                    <span class="spec-val" id="insCategory">--</span>
+                  </div>
+                  <div class="spec-item">
+                    <span class="spec-label">Mã Video (ID)</span>
+                    <span class="spec-val font-mono text-cyan" id="insVideoId"
+                      >--</span
+                    >
+                  </div>
+                </div>
+
+                <!-- Benchmark Diagnosis Banner -->
+                <div class="diagnosis-banner" id="insEvalBanner">
+                  <div class="diagnosis-badge" id="insEvalBadge">
+                    HIỆU SUẤT XUẤT SẮC
+                  </div>
+                  <p id="insEvalText" class="diagnosis-desc">
+                    Video này có CTR và Giữ chân người xem đều vượt chuẩn của
+                    kênh.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: 4 Core Metric Cards with Benchmark Comparison -->
+            <div class="kpi-metrics-row">
+              <div class="kpi-box">
+                <span class="kpi-label">Lượt xem (Views)</span>
+                <div class="kpi-num" id="insViews">--</div>
+                <div class="kpi-comp" id="insViewsComp">--</div>
+              </div>
+
+              <div class="kpi-box">
+                <span class="kpi-label">CTR (Tỉ lệ click)</span>
+                <div class="kpi-num" id="insCtr">--%</div>
+                <div class="kpi-comp" id="insCtrComp">+0% vs chuẩn kênh</div>
+              </div>
+
+              <div class="kpi-box">
+                <span class="kpi-label">% Giữ chân TB (Retention)</span>
+                <div class="kpi-num" id="insRetention">--%</div>
+                <div class="kpi-comp" id="insRetentionComp">
+                  +0% vs chuẩn kênh
+                </div>
+              </div>
+
+              <div class="kpi-box">
+                <span class="kpi-label">Tổng giờ xem (Watch Time)</span>
+                <div class="kpi-num" id="insWatchTime">--h</div>
+                <div class="kpi-comp font-mono" id="insAvgDuration">
+                  AVD: --:--
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Audience Funnel -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="filter"></i>
+                  <h4>
+                    Phễu chuyển đổi người xem (Audience Conversion Funnel)
+                  </h4>
+                </div>
+                <span class="panel-subtitle"
+                  >Từ lúc hiển thị thumbnail đến khi tạo ra thời gian xem</span
+                >
+              </div>
+              <div class="funnel-chain" id="funnelContainer">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Row 4: Two-Column Deep-Dive Charts & Meta -->
+            <div class="modal-columns-grid">
+              <!-- Left Column: Retention Curve + Realtime Views -->
+              <div class="modal-col-left">
+                <!-- Retention Curve -->
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <i data-lucide="trending-up"></i>
+                      <h4>
+                        Tỷ lệ giữ chân người xem theo thời lượng (Audience
+                        Retention Curve)
+                      </h4>
+                    </div>
+                    <span class="panel-subtitle"
+                      >So sánh với đường chuẩn trung bình của kênh</span
+                    >
+                  </div>
+                  <div class="chart-canvas-container main-chart">
+                    <canvas id="retentionChart"></canvas>
+                  </div>
+                  <div class="retention-insights-row" id="retentionInsights">
+                    <!-- Insights generated -->
+                  </div>
+                </div>
+
+                <!-- Realtime 48h -->
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <i data-lucide="bar-chart-2"></i>
+                      <h4>Lượt xem theo từng giờ (48 giờ gần nhất)</h4>
+                    </div>
+                    <span class="badge-realtime"
+                      ><span class="pulse-dot"></span> Đang cập nhật
+                      Realtime</span
+                    >
+                  </div>
+                  <div class="chart-canvas-container mini-chart">
+                    <canvas id="realtimeChart"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Traffic Sources + Tags + Description -->
+              <div class="modal-col-right">
+                <!-- Traffic Sources -->
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <i data-lucide="pie-chart"></i>
+                      <h4>Nguồn lưu lượng (Traffic Sources)</h4>
+                    </div>
+                  </div>
+                  <div class="chart-canvas-container doughnut-chart">
+                    <canvas id="trafficChart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Tags Container -->
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <i data-lucide="tag"></i>
+                      <h4>Thẻ Tags đã gắn (<span id="tagCount">0</span>)</h4>
+                    </div>
+                    <button class="btn-action-sm" id="btnCopyTags">
+                      <i data-lucide="copy"></i>
+                      <span>Sao chép tất cả tag</span>
+                    </button>
+                  </div>
+                  <div class="tags-cloud" id="insTagsContainer">
+                    <!-- Rendered tags -->
+                  </div>
+                </div>
+
+                <!-- Description Preview -->
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <i data-lucide="file-text"></i>
+                      <h4>Mô tả video (Description)</h4>
+                    </div>
+                  </div>
+                  <div class="description-preview" id="insDescription">--</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATION TOAST -->
+      <div class="toast" id="toast">
+        <i data-lucide="check-circle-2" class="toast-icon"></i>
+        <span id="toastMsg">Thông báo</span>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
 </html>
