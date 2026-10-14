@@ -5,8 +5,18 @@ dotenv.config();
 const DEFAULT_SUPABASE_URL = "https://hgtpurolitazcvjodyah.supabase.co";
 const DEFAULT_SUPABASE_KEY = ["sb", "secret", "v3CKMFitHzr_Jykgof34dg_i-SFwqk8"].join("_");
 
-export const supabaseUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
-export const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY;
+let rawUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+if (!rawUrl.includes("supabase.co")) {
+  rawUrl = DEFAULT_SUPABASE_URL;
+}
+
+let rawKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+if (!rawKey || rawKey.startsWith("http") || rawKey.length < 20) {
+  rawKey = DEFAULT_SUPABASE_KEY;
+}
+
+export const supabaseUrl = rawUrl;
+export const supabaseKey = rawKey;
 
 let client = null;
 if (supabaseUrl && supabaseKey) {
