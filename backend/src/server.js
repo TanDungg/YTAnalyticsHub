@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/authRoutes.js';
 import channelRoutes from './routes/channelRoutes.js';
+import { isSupabaseConfigured, supabase } from './db/supabase.js';
 
 dotenv.config();
 
@@ -28,10 +29,24 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/channels', channelRoutes);
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let sbTest = null;
+  let sbError = null;
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.from('channels').select('id, name');
+      sbTest = data;
+      sbError = error ? error.message : null;
+    } catch (e) {
+      sbError = e.message;
+    }
+  }
   res.json({
     status: "ok",
     service: "YouTube Multi-Channel Analytics Backend",
+    isSupabaseConfigured: isSupabaseConfigured(),
+    supabaseTestCount: sbTest ? sbTest.length : null,
+    supabaseError: sbError,
     timestamp: new Date().toISOString()
   });
 });
