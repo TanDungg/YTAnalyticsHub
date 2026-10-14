@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/authRoutes.js';
 import channelRoutes from './routes/channelRoutes.js';
-import { isSupabaseConfigured, supabase } from './db/supabase.js';
+import { isSupabaseConfigured, supabase, supabaseUrl, supabaseKey } from './db/supabase.js';
 
 dotenv.config();
 
@@ -28,8 +28,6 @@ app.use(express.json());
 // Routes API
 app.use('/api/auth', authRoutes);
 app.use('/api/channels', channelRoutes);
-
-import { isSupabaseConfigured, supabase, supabaseUrl, supabaseKey } from './db/supabase.js';
 
 app.get('/api/health', async (req, res) => {
   let sbTest = null;
