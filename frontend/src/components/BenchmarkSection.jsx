@@ -55,8 +55,8 @@ export default function BenchmarkSection({ benchmarks }) {
             <div className="icon-box"><MousePointerClick size={16} /></div>
           </div>
           <div className="value-row">
-            <span className="value">{hasCtr ? `${benchmarks.avgCtr}%` : 'Chưa có'}</span>
-            <span className="target-tag">
+            <span className={`value ${!hasCtr ? 'empty-val' : ''}`}>{hasCtr ? `${benchmarks.avgCtr}%` : 'Chưa có'}</span>
+            <span className={`target-tag ${!hasCtr ? 'hint-tag' : ''}`}>
               {hasCtr ? (
                 <>Mục tiêu &gt; <strong>{benchmarks.targetCtr}%</strong></>
               ) : (
@@ -75,8 +75,8 @@ export default function BenchmarkSection({ benchmarks }) {
             <div className="icon-box"><Activity size={16} /></div>
           </div>
           <div className="value-row">
-            <span className="value">{hasRetention ? `${benchmarks.avgRetention}%` : 'Chưa có'}</span>
-            <span className="target-tag">
+            <span className={`value ${!hasRetention ? 'empty-val' : ''}`}>{hasRetention ? `${benchmarks.avgRetention}%` : 'Chưa có'}</span>
+            <span className={`target-tag ${!hasRetention ? 'hint-tag' : ''}`}>
               {hasRetention ? (
                 <>Mục tiêu &gt; <strong>{benchmarks.targetRetention}%</strong></>
               ) : (

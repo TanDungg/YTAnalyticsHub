@@ -1,11 +1,12 @@
-﻿import fs from 'fs';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { supabase, isSupabaseConfigured } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, '../../data/channels.json');
+// Lưu DB tại thư mục gốc /data/channels.json để tuyệt đối không kích hoạt nodemon restart trong backend
+const DB_PATH = path.resolve(__dirname, '../../../data/channels.json');
 
 class Store {
   constructor() {

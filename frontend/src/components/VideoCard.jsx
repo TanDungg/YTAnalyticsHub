@@ -1,11 +1,15 @@
 import React from 'react';
 
 export default function VideoCard({ video, benchmark, onSelect }) {
-  const ctrDiff = benchmark ? (video.ctr - benchmark.avgCtr).toFixed(1) : 0;
-  const isCtrHigher = ctrDiff >= 0;
+  const hasViews = video.views > 0;
+  const hasBenchmarkCtr = benchmark && typeof benchmark.avgCtr === 'number' && benchmark.avgCtr > 0;
+  const hasBenchmarkRet = benchmark && typeof benchmark.avgRetention === 'number' && benchmark.avgRetention > 0;
 
-  const retDiff = benchmark ? (video.retention - benchmark.avgRetention).toFixed(1) : 0;
-  const isRetHigher = retDiff >= 0;
+  const ctrDiff = hasBenchmarkCtr && hasViews && video.ctr > 0 ? (video.ctr - benchmark.avgCtr).toFixed(1) : null;
+  const isCtrHigher = ctrDiff !== null && ctrDiff >= 0;
+
+  const retDiff = hasBenchmarkRet && hasViews && video.retention > 0 ? (video.retention - benchmark.avgRetention).toFixed(1) : null;
+  const isRetHigher = retDiff !== null && retDiff >= 0;
 
   return (
     <div className="video-card" onClick={() => onSelect(video)}>
@@ -34,24 +38,40 @@ export default function VideoCard({ video, benchmark, onSelect }) {
           <div className="card-stat-item">
             <span className="card-stat-label">CTR</span>
             <div className="card-stat-val">
-              {video.ctr}%{' '}
-              <span className={`comp-pill ${isCtrHigher ? 'higher' : 'lower'}`}>
-                {isCtrHigher ? '+' : ''}{ctrDiff}%
-              </span>
+              {hasViews && video.ctr > 0 ? (
+                <>
+                  {video.ctr}%{' '}
+                  {ctrDiff !== null && (
+                    <span className={`comp-pill ${isCtrHigher ? 'higher' : 'lower'}`}>
+                      {isCtrHigher ? '+' : ''}{ctrDiff}%
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Chưa có</span>
+              )}
             </div>
           </div>
           <div className="card-stat-item">
             <span className="card-stat-label">% Giữ chân</span>
             <div className="card-stat-val">
-              {video.retention}%{' '}
-              <span className={`comp-pill ${isRetHigher ? 'higher' : 'lower'}`}>
-                {isRetHigher ? '+' : ''}{retDiff}%
-              </span>
+              {hasViews && video.retention > 0 ? (
+                <>
+                  {video.retention}%{' '}
+                  {retDiff !== null && (
+                    <span className={`comp-pill ${isRetHigher ? 'higher' : 'lower'}`}>
+                      {isRetHigher ? '+' : ''}{retDiff}%
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Chưa có</span>
+              )}
             </div>
           </div>
           <div className="card-stat-item">
             <span className="card-stat-label">Tổng giờ xem</span>
-            <div className="card-stat-val">{video.watchTimeHours?.toLocaleString() || 0}h</div>
+            <div className="card-stat-val">{hasViews ? `${video.watchTimeHours?.toLocaleString() || 0}h` : '0h'}</div>
           </div>
         </div>
 

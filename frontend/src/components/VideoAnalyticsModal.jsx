@@ -45,37 +45,48 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
 
   if (!video) return null;
 
+  const hasViews = typeof video.views === 'number' && video.views > 0;
+  const hasCtr = typeof video.ctr === 'number' && video.ctr > 0;
+  const hasRetention = typeof video.retention === 'number' && video.retention > 0;
+  const hasBenchmark = benchmark && typeof benchmark.avgCtr === 'number' && benchmark.avgCtr > 0 && typeof benchmark.avgRetention === 'number' && benchmark.avgRetention > 0;
+
   // So sánh với chuẩn kênh
-  const ctrDiff = benchmark ? ((video.ctr - benchmark.avgCtr) / benchmark.avgCtr * 100).toFixed(1) : 0;
-  const retDiff = benchmark ? ((video.retention - benchmark.avgRetention) / benchmark.avgRetention * 100).toFixed(1) : 0;
+  const ctrDiff = hasBenchmark && hasCtr ? (video.ctr - benchmark.avgCtr).toFixed(1) : null;
+  const retDiff = hasBenchmark && hasRetention ? (video.retention - benchmark.avgRetention).toFixed(1) : null;
 
-  let evalBadge = "HIỆU SUẤT XUẤT SẮC";
-  let evalBg = "var(--neon-emerald)";
-  let evalText = `Cả CTR (+${ctrDiff}%) và Giữ chân người xem (+${retDiff}%) đều vượt chuẩn của kênh. Thuật toán YouTube đang đề xuất rất tích cực video này.`;
+  let evalBadge = "CHƯA CÓ DỮ LIỆU PHÂN TÍCH";
+  let evalBg = "var(--text-muted)";
+  let evalText = "Video này hiện chưa có đủ dữ liệu phân tích từ YouTube. Các chỉ số CTR, % Giữ chân và phễu chuyển đổi sẽ hiển thị đầy đủ khi video phát sinh lượt xem.";
 
-  if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr < (benchmark?.avgCtr || 0)) {
-    evalBadge = "TIỀM NĂNG - CẦN ĐỔI THUMBNAIL";
-    evalBg = "var(--neon-amber)";
-    evalText = `Nội dung giữ chân người xem rất tốt (+${retDiff}%), nhưng CTR thấp hơn chuẩn (${ctrDiff}%). Thay đổi Thumbnail hoặc Tiêu đề hấp dẫn hơn sẽ giúp video bùng nổ view!`;
-  } else if (video.ctr >= (benchmark?.avgCtr || 0) && video.retention < (benchmark?.avgRetention || 0)) {
-    evalBadge = "CẨN THẬN CLICKBAIT";
-    evalBg = "var(--yt-red)";
-    evalText = `CTR cao (+${ctrDiff}%) chứng tỏ Thumbnail hấp dẫn, nhưng người xem thoát sớm (${retDiff}% so với chuẩn). Cần kiểm tra lại đoạn mở đầu (Hook) của video.`;
-  } else if (video.ctr < (benchmark?.avgCtr || 0) && video.retention < (benchmark?.avgRetention || 0)) {
-    evalBadge = "DƯỚI MỨC TRUNG BÌNH";
-    evalBg = "var(--text-muted)";
-    evalText = `Cả tỉ lệ click lẫn thời gian giữ chân đều chưa đạt ngưỡng trung bình của kênh. Cần tối ưu lại chủ đề cho các video sau.`;
+  if (hasViews && hasCtr && hasRetention) {
+    if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr >= (benchmark?.avgCtr || 0)) {
+      evalBadge = "HIỆU SUẤT XUẤT SẮC";
+      evalBg = "var(--neon-emerald)";
+      evalText = `Cả CTR (+${ctrDiff || 0}%) và Giữ chân người xem (+${retDiff || 0}%) đều vượt chuẩn của kênh. Thuật toán YouTube đang đề xuất rất tích cực video này.`;
+    } else if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr < (benchmark?.avgCtr || 0)) {
+      evalBadge = "TIỀM NĂNG - CẦN ĐỔI THUMBNAIL";
+      evalBg = "var(--neon-amber)";
+      evalText = `Nội dung giữ chân người xem rất tốt (+${retDiff || 0}%), nhưng CTR thấp hơn chuẩn (${ctrDiff || 0}%). Thay đổi Thumbnail hoặc Tiêu đề hấp dẫn hơn sẽ giúp video bùng nổ view!`;
+    } else if (video.ctr >= (benchmark?.avgCtr || 0) && video.retention < (benchmark?.avgRetention || 0)) {
+      evalBadge = "CẨN THẬN CLICKBAIT";
+      evalBg = "var(--yt-red)";
+      evalText = `CTR cao (+${ctrDiff || 0}%) chứng tỏ Thumbnail hấp dẫn, nhưng người xem thoát sớm (${retDiff || 0}% so với chuẩn). Cần kiểm tra lại đoạn mở đầu (Hook) của video.`;
+    } else {
+      evalBadge = "DƯỚI MỨC TRUNG BÌNH";
+      evalBg = "var(--text-muted)";
+      evalText = `Cả tỉ lệ click lẫn thời gian giữ chân đều chưa đạt ngưỡng trung bình của kênh. Cần tối ưu lại chủ đề cho các video sau.`;
+    }
   }
 
   // Retention Chart Config
   const retentionLabels = ["0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"];
-  const decayRate = (100 - video.retention) / 50;
+  const decayRate = hasRetention ? (100 - video.retention) / 50 : 0;
   const retentionData = {
     labels: retentionLabels,
     datasets: [
       {
         label: "Video này",
-        data: [
+        data: hasRetention ? [
           100,
           Math.round(85 - decayRate * 2),
           Math.round(76 - decayRate * 4),
@@ -87,7 +98,7 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
           Math.round(video.retention - 8),
           Math.round(video.retention - 12),
           Math.round(video.retention - 16)
-        ],
+        ] : [],
         borderColor: "#38bdf8",
         backgroundColor: "rgba(56, 189, 248, 0.12)",
         fill: true,
@@ -97,8 +108,8 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
         pointBackgroundColor: "#38bdf8"
       },
       {
-        label: `Chuẩn kênh (${benchmark?.avgRetention || 45}%)`,
-        data: retentionLabels.map(() => benchmark?.avgRetention || 45),
+        label: `Chuẩn kênh (${benchmark?.avgRetention || 0}%)`,
+        data: retentionLabels.map(() => benchmark?.avgRetention || 0),
         borderColor: "rgba(255, 255, 255, 0.3)",
         borderDash: [5, 5],
         borderWidth: 1.5,
@@ -109,16 +120,17 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
   };
 
   // Traffic Chart Config
+  const hasTraffic = video.traffic && typeof video.traffic === 'object' && Object.values(video.traffic).some(v => v > 0);
   const trafficData = {
     labels: ["Đề xuất (Suggested)", "Tìm kiếm (Search)", "Duyệt xem (Browse)", "Khác / Shorts Feed"],
     datasets: [
       {
-        data: [
-          video.traffic?.suggested || 50,
-          video.traffic?.search || 30,
-          video.traffic?.browse || 15,
-          video.traffic?.other || 5
-        ],
+        data: hasTraffic ? [
+          video.traffic?.suggested || 0,
+          video.traffic?.search || 0,
+          video.traffic?.browse || 0,
+          video.traffic?.other || 0
+        ] : [],
         backgroundColor: ["#ff0033", "#38bdf8", "#34d399", "#c084fc"],
         borderWidth: 0
       }
@@ -126,12 +138,13 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
   };
 
   // Realtime Chart Config
+  const hasRealtime = Array.isArray(video.realtime48h) && video.realtime48h.some(v => v > 0);
   const realtimeData = {
     labels: Array.from({ length: 24 }, (_, i) => `${24 - i}h trước`),
     datasets: [
       {
         label: "Lượt xem / giờ",
-        data: video.realtime48h || Array.from({ length: 24 }, () => Math.floor(Math.random() * 500) + 50),
+        data: hasRealtime ? video.realtime48h : [],
         backgroundColor: "rgba(56, 189, 248, 0.75)",
         hoverBackgroundColor: "#38bdf8",
         borderRadius: 3
@@ -175,15 +188,17 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
               <div className="specs-grid">
                 <div className="spec-item">
                   <span className="spec-label">Ngày xuất bản</span>
-                  <span className="spec-val">{video.publishDate}</span>
+                  <span className="spec-val">{video.publishDate || "Chưa có"}</span>
                 </div>
                 <div className="spec-item">
                   <span className="spec-label">Trạng thái</span>
-                  <span className="spec-val text-green"><Globe size={13} /> {video.status}</span>
+                  <span className={`spec-val ${video.status === 'Công khai' ? 'text-green' : video.status === 'Riêng tư' ? 'text-amber' : 'text-cyan'}`}>
+                    <Globe size={13} /> {video.status || 'Chưa rõ'}
+                  </span>
                 </div>
                 <div className="spec-item">
                   <span className="spec-label">Danh mục</span>
-                  <span className="spec-val">{video.category}</span>
+                  <span className="spec-val">{video.category || 'Chưa phân loại'}</span>
                 </div>
                 <div className="spec-item">
                   <span className="spec-label">Mã Video (ID)</span>
@@ -204,27 +219,31 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
           <div className="kpi-metrics-row">
             <div className="kpi-box">
               <span className="kpi-label">Lượt xem (Views)</span>
-              <div className="kpi-num">{video.views.toLocaleString()}</div>
-              <div className="kpi-comp">{(video.views / 1000).toFixed(1)}K lượt xem thực tế</div>
+              <div className="kpi-num">{hasViews ? video.views.toLocaleString() : '0'}</div>
+              <div className="kpi-comp">{hasViews ? `${video.views.toLocaleString()} lượt xem thực tế` : 'Chưa có lượt xem'}</div>
             </div>
             <div className="kpi-box">
               <span className="kpi-label">CTR (Tỉ lệ click)</span>
-              <div className="kpi-num">{video.ctr}%</div>
-              <div className={`kpi-comp ${ctrDiff >= 0 ? '' : 'neg'}`}>
-                {ctrDiff >= 0 ? '+' : ''}{ctrDiff}% vs chuẩn kênh ({benchmark?.avgCtr}%)
+              <div className="kpi-num">{hasCtr ? `${video.ctr}%` : 'Chưa có'}</div>
+              <div className={`kpi-comp ${hasCtr && ctrDiff !== null && ctrDiff >= 0 ? '' : 'neg'}`}>
+                {hasCtr && hasBenchmark && ctrDiff !== null
+                  ? `${ctrDiff >= 0 ? '+' : ''}${ctrDiff}% vs chuẩn kênh (${benchmark?.avgCtr}%)`
+                  : 'Chưa có'}
               </div>
             </div>
             <div className="kpi-box">
               <span className="kpi-label">% Giữ chân TB (Retention)</span>
-              <div className="kpi-num">{video.retention}%</div>
-              <div className={`kpi-comp ${retDiff >= 0 ? '' : 'neg'}`}>
-                {retDiff >= 0 ? '+' : ''}{retDiff}% vs chuẩn kênh ({benchmark?.avgRetention}%)
+              <div className="kpi-num">{hasRetention ? `${video.retention}%` : 'Chưa có'}</div>
+              <div className={`kpi-comp ${hasRetention && retDiff !== null && retDiff >= 0 ? '' : 'neg'}`}>
+                {hasRetention && hasBenchmark && retDiff !== null
+                  ? `${retDiff >= 0 ? '+' : ''}${retDiff}% vs chuẩn kênh (${benchmark?.avgRetention}%)`
+                  : 'Chưa có'}
               </div>
             </div>
             <div className="kpi-box">
               <span className="kpi-label">Tổng giờ xem (Watch Time)</span>
-              <div className="kpi-num">{video.watchTimeHours?.toLocaleString() || 0}h</div>
-              <div className="kpi-comp font-mono">AVD: {video.avgDurationSec}</div>
+              <div className="kpi-num">{video.watchTimeHours && video.watchTimeHours > 0 ? `${video.watchTimeHours}h` : '0h'}</div>
+              <div className="kpi-comp font-mono">{video.avgDurationSec && video.avgDurationSec !== '0:00' ? `AVD: ${video.avgDurationSec}` : 'AVD: Chưa có'}</div>
             </div>
           </div>
 
@@ -240,23 +259,23 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
             <div className="funnel-chain">
               <div className="funnel-step">
                 <span className="funnel-name">Lượt hiển thị</span>
-                <div className="funnel-val">{(video.impressions / 1000000).toFixed(2)}M</div>
-                <div className="funnel-rate">100% người thấy</div>
+                <div className="funnel-val">{video.impressions && video.impressions > 0 ? video.impressions.toLocaleString() : 'Chưa có'}</div>
+                <div className="funnel-rate">{video.impressions > 0 ? '100% người thấy' : 'Chưa có'}</div>
               </div>
               <div className="funnel-step">
                 <span className="funnel-name">Tỷ lệ Click (CTR)</span>
-                <div className="funnel-val">{video.ctr}%</div>
-                <div className="funnel-rate">Quyết định xem</div>
+                <div className="funnel-val">{hasCtr ? `${video.ctr}%` : 'Chưa có'}</div>
+                <div className="funnel-rate">{hasCtr ? 'Quyết định xem' : 'Chưa có'}</div>
               </div>
               <div className="funnel-step">
                 <span className="funnel-name">Lượt xem (Views)</span>
-                <div className="funnel-val">{(video.views / 1000).toFixed(1)}K</div>
-                <div className="funnel-rate">Vào video</div>
+                <div className="funnel-val">{hasViews ? video.views.toLocaleString() : '0'}</div>
+                <div className="funnel-rate">{hasViews ? 'Vào video' : 'Chưa có'}</div>
               </div>
               <div className="funnel-step">
                 <span className="funnel-name">Tổng giờ xem</span>
-                <div className="funnel-val">{video.watchTimeHours?.toLocaleString() || 0}h</div>
-                <div className="funnel-rate">Tích lũy thực tế</div>
+                <div className="funnel-val">{video.watchTimeHours && video.watchTimeHours > 0 ? `${video.watchTimeHours}h` : '0h'}</div>
+                <div className="funnel-rate">{video.watchTimeHours > 0 ? 'Tích lũy thực tế' : 'Chưa có'}</div>
               </div>
             </div>
           </div>
@@ -272,19 +291,29 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
                   </div>
                   <span className="panel-subtitle">So sánh với đường chuẩn trung bình</span>
                 </div>
-                <div className="chart-canvas-container main-chart">
-                  <Line data={retentionData} options={{ responsive: true, maintainAspectRatio: false }} />
-                </div>
-                <div className="retention-insights-row">
-                  <div className="insight-item">
-                    <span className="insight-dot dot-green"></span>
-                    <span>Tỷ lệ xem 30 giây đầu: <strong>76%</strong> (Khởi đầu rất tốt)</span>
+                {hasViews && hasRetention ? (
+                  <>
+                    <div className="chart-canvas-container main-chart">
+                      <Line data={retentionData} options={{ responsive: true, maintainAspectRatio: false }} />
+                    </div>
+                    <div className="retention-insights-row">
+                      <div className="insight-item">
+                        <span className="insight-dot dot-green"></span>
+                        <span>Tỷ lệ xem 30 giây đầu: <strong>{Math.round(video.retention * 1.4)}%</strong></span>
+                      </div>
+                      <div className="insight-item">
+                        <span className="insight-dot dot-red"></span>
+                        <span>Tỷ lệ giữ chân trung bình: <strong>{video.retention}%</strong></span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="chart-empty-state">
+                    <TrendingUp size={28} className="empty-chart-icon" />
+                    <span className="empty-chart-title">Chưa có dữ liệu tỷ lệ giữ chân</span>
+                    <span className="empty-chart-desc">Đường cong Retention sẽ tự động hiển thị khi video phát sinh lượt xem thực tế trên YouTube.</span>
                   </div>
-                  <div className="insight-item">
-                    <span className="insight-dot dot-red"></span>
-                    <span>Điểm tụt view mạnh nhất: <strong>ở mốc 60%</strong> (Chuyển tiếp nội dung)</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="panel-card">
@@ -295,9 +324,17 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
                   </div>
                   <span className="badge-realtime"><span className="pulse-dot"></span> Realtime</span>
                 </div>
-                <div className="chart-canvas-container mini-chart">
-                  <Bar data={realtimeData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
-                </div>
+                {hasViews && hasRealtime ? (
+                  <div className="chart-canvas-container mini-chart">
+                    <Bar data={realtimeData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+                  </div>
+                ) : (
+                  <div className="chart-empty-state" style={{ minHeight: 140 }}>
+                    <BarChart2 size={26} className="empty-chart-icon" />
+                    <span className="empty-chart-title">Chưa có lượt xem trong 48 giờ qua</span>
+                    <span className="empty-chart-desc">Lượt xem theo từng giờ sẽ hiển thị tại đây khi có tương tác mới.</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -309,9 +346,17 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
                     <h4>Nguồn lưu lượng (Traffic Sources)</h4>
                   </div>
                 </div>
-                <div className="chart-canvas-container doughnut-chart">
-                  <Doughnut data={trafficData} options={{ responsive: true, maintainAspectRatio: false, cutout: '68%' }} />
-                </div>
+                {hasViews && hasTraffic ? (
+                  <div className="chart-canvas-container doughnut-chart">
+                    <Doughnut data={trafficData} options={{ responsive: true, maintainAspectRatio: false, cutout: '68%' }} />
+                  </div>
+                ) : (
+                  <div className="chart-empty-state">
+                    <PieChart size={28} className="empty-chart-icon" />
+                    <span className="empty-chart-title">Chưa có dữ liệu nguồn lưu lượng</span>
+                    <span className="empty-chart-desc">Dữ liệu nguồn xem (Đề xuất, Tìm kiếm, Duyệt xem) sẽ hiển thị khi có người xem truy cập.</span>
+                  </div>
+                )}
               </div>
 
               <div className="panel-card">

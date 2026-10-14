@@ -1,6 +1,7 @@
-﻿import { google } from 'googleapis';
+import { google } from 'googleapis';
 import { oauth2Client } from '../config/google.js';
 import { db } from '../db/store.js';
+import { getCategoryName } from '../utils/youtubeCategories.js';
 
 export class YouTubeService {
   /**
@@ -127,9 +128,6 @@ export class YouTubeService {
 
         if (vId && vTitle) {
           const isShorts = vDuration.includes("0:") && parseInt(vDuration.split(":")[1] || "0") < 60;
-          const ctrCalc = parseFloat((5.8 + (i % 6) * 0.7).toFixed(1));
-          const retCalc = parseFloat((43 + (i % 5) * 2.8).toFixed(1));
-
           parsedVideos.push({
             id: vId,
             title: vTitle,
@@ -140,15 +138,15 @@ export class YouTubeService {
             category: "Nội dung YouTube",
             thumb: vThumb,
             views: vViews,
-            impressions: vViews * 11,
-            ctr: ctrCalc,
-            retention: retCalc,
-            watchTimeHours: Math.round(vViews * 0.08),
-            avgDurationSec: "4m 20s",
+            impressions: null,
+            ctr: null,
+            retention: null,
+            watchTimeHours: null,
+            avgDurationSec: null,
             tags: [channelName.toLowerCase(), "youtube", "video"],
             description: `Video chính thức từ kênh ${channelName}.\nXem trực tiếp tại: https://www.youtube.com/watch?v=${vId}`,
-            traffic: { suggested: 55, search: 27, browse: 14, other: 4 },
-            realtime48h: Array.from({ length: 24 }, () => Math.floor(Math.random() * 500) + 40)
+            traffic: null,
+            realtime48h: null
           });
         }
       }
@@ -225,19 +223,21 @@ export class YouTubeService {
     });
 
     const item = response.data.items?.[0];
-    if (!item) throw new Error("Không tìm thấy kênh YouTube nào thuộc tài khoản này");
+    if (!item) {
+      throw new Error("Tài khoản Google này chưa có Kênh YouTube. Vui lòng mở YouTube bằng tài khoản này và bấm 'Tạo kênh' trước.");
+    }
 
     return {
       channelId: item.id,
-      name: item.snippet.title,
-      handle: item.snippet.customUrl || `@${item.snippet.title.replace(/\s+/g, '').toLowerCase()}`,
-      topic: item.snippet.description ? item.snippet.description.slice(0, 80) : "Kênh cá nhân",
-      avatar: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
-      uploadsPlaylistId: item.contentDetails.relatedPlaylists.uploads,
+      name: item.snippet?.title || "Kênh YouTube",
+      handle: item.snippet?.customUrl || `@${(item.snippet?.title || "channel").replace(/\s+/g, '').toLowerCase()}`,
+      topic: item.snippet?.description ? item.snippet.description.slice(0, 80) : "Kênh cá nhân",
+      avatar: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || "",
+      uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null,
       benchmarks: {
-        subscribers: parseInt(item.statistics.subscriberCount || "0").toLocaleString(),
+        subscribers: parseInt(item.statistics?.subscriberCount || "0").toLocaleString(),
         subsTrend: "+0",
-        views28d: parseInt(item.statistics.viewCount || "0").toLocaleString(),
+        views28d: parseInt(item.statistics?.viewCount || "0").toLocaleString(),
         viewsTrend: "+0%",
         avgCtr: 0,
         targetCtr: 0,
@@ -270,18 +270,11 @@ export class YouTubeService {
 
     const videoIds = playlistRes.data.items?.map(it => it.contentDetails.videoId) || [];
     if (videoIds.length === 0) {
-      if (channel.benchmarks) {
-        channel.benchmarks.avgCtr = 0;
-        channel.benchmarks.targetCtr = 0;
-        channel.benchmarks.avgRetention = 0;
-        channel.benchmarks.targetRetention = 0;
-        await db.saveChannel(channel);
-      }
-      return [];
+      return channel.videos || [];
     }
 
     const videosRes = await youtube.videos.list({
-      part: ['snippet', 'statistics', 'contentDetails'],
+      part: ['snippet', 'statistics', 'contentDetails', 'status'],
       id: videoIds
     });
 
@@ -289,6 +282,15 @@ export class YouTubeService {
       const durationIso = v.contentDetails.duration;
       const durationFormatted = formatDuration(durationIso);
       const isShorts = durationFormatted.includes("0:") || (parseInt(v.contentDetails.duration.match(/\d+S/)?.[0] || "0") < 60 && !durationIso.includes("M"));
+      const vCount = parseInt(v.statistics.viewCount || "0");
+      const privacy = v.status?.privacyStatus;
+      const statusText = privacy === 'public'
+        ? 'Công khai'
+        : privacy === 'unlisted'
+          ? 'Không công khai'
+          : privacy === 'private'
+            ? 'Riêng tư'
+            : 'Công khai';
 
       return {
         id: v.id,
@@ -296,25 +298,26 @@ export class YouTubeService {
         type: isShorts ? "shorts" : "long",
         duration: durationFormatted,
         publishDate: new Date(v.snippet.publishedAt).toLocaleDateString('vi-VN'),
-        status: v.status?.privacyStatus === 'public' ? 'Công khai' : 'Không công khai',
-        category: "Nội dung",
+        status: statusText,
+        category: getCategoryName(v.snippet?.categoryId),
         thumb: v.snippet.thumbnails?.maxres?.url || v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.default?.url,
-        views: parseInt(v.statistics.viewCount || "0"),
-        impressions: parseInt(v.statistics.viewCount || "0") * 10,
-        ctr: 7.2,
-        retention: 46.5,
-        watchTimeHours: Math.round(parseInt(v.statistics.viewCount || "0") * 0.08),
-        avgDurationSec: "4m 12s",
+        views: vCount,
+        impressions: null,
+        ctr: null,
+        retention: null,
+        watchTimeHours: null,
+        avgDurationSec: null,
         tags: v.snippet.tags || [],
-        description: v.snippet.description,
-        traffic: { suggested: 50, search: 30, browse: 15, other: 5 },
-        realtime48h: Array.from({ length: 24 }, () => Math.floor(Math.random() * 500) + 50)
+        description: v.snippet.description || "",
+        traffic: null,
+        realtime48h: null
       };
     }) || [];
 
-    if (parsedVideos.length > 0 && channel.benchmarks) {
-      const avgCtr = parseFloat((parsedVideos.reduce((a, b) => a + (b.ctr || 0), 0) / parsedVideos.length).toFixed(1));
-      const avgRetention = parseFloat((parsedVideos.reduce((a, b) => a + (b.retention || 0), 0) / parsedVideos.length).toFixed(1));
+    const activeVideos = parsedVideos.filter(v => v.views > 0);
+    if (activeVideos.length > 0 && channel.benchmarks) {
+      const avgCtr = parseFloat((activeVideos.reduce((a, b) => a + (b.ctr || 0), 0) / activeVideos.length).toFixed(1));
+      const avgRetention = parseFloat((activeVideos.reduce((a, b) => a + (b.retention || 0), 0) / activeVideos.length).toFixed(1));
       const totalViews = parsedVideos.reduce((a, b) => a + (b.views || 0), 0);
 
       channel.benchmarks.avgCtr = avgCtr;
@@ -322,6 +325,13 @@ export class YouTubeService {
       channel.benchmarks.avgRetention = avgRetention;
       channel.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
       channel.benchmarks.views28d = totalViews.toLocaleString();
+      await db.saveChannel(channel);
+    } else if (channel.benchmarks) {
+      channel.benchmarks.avgCtr = 0;
+      channel.benchmarks.targetCtr = 0;
+      channel.benchmarks.avgRetention = 0;
+      channel.benchmarks.targetRetention = 0;
+      channel.benchmarks.views28d = "0";
       await db.saveChannel(channel);
     }
 

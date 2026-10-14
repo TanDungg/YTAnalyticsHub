@@ -1,8 +1,9 @@
-﻿import express from 'express';
-import { google } from 'googleapis';
-import { getAuthUrl } from '../config/google.js';
-import { YouTubeService } from '../services/youtubeService.js';
-import { db } from '../db/store.js';
+import express from "express";
+import { google } from "googleapis";
+import { getAuthUrl } from "../config/google.js";
+import { YouTubeService } from "../services/youtubeService.js";
+import { db } from "../db/store.js";
+import { getCategoryName } from "../utils/youtubeCategories.js";
 
 const router = express.Router();
 
@@ -12,11 +13,14 @@ const processedCodes = new Set();
 /**
  * 1. LẤY ĐƯỜNG DẪN ĐĂNG NHẬP GOOGLE OAUTH 2.0
  */
-router.get('/google/url', (req, res) => {
+router.get("/google/url", (req, res) => {
   try {
-    if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID.includes("your_google")) {
+    if (
+      !process.env.GOOGLE_CLIENT_ID ||
+      process.env.GOOGLE_CLIENT_ID.includes("your_google")
+    ) {
       return res.status(400).json({
-        error: "Chưa cấu hình GOOGLE_CLIENT_ID trong file .env của backend."
+        error: "Chưa cấu hình GOOGLE_CLIENT_ID trong file .env của backend.",
       });
     }
     const url = getAuthUrl();
@@ -29,9 +33,11 @@ router.get('/google/url', (req, res) => {
 /**
  * 2. GOOGLE OAUTH CALLBACK (XỬ LÝ ĐỒNG BỘ VIDEO TỨC THÌ & CHỐNG DUPLICATE)
  */
-router.get('/google/callback', async (req, res) => {
+router.get("/google/callback", async (req, res) => {
   const { code } = req.query;
-  const clientUrl = process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173');
+  const clientUrl =
+    process.env.CLIENT_URL ||
+    (process.env.NODE_ENV === "production" ? "" : "http://localhost:5173");
 
   if (!code) {
     return res.redirect(`${clientUrl}?error=missing_code`);
@@ -48,7 +54,7 @@ router.get('/google/callback', async (req, res) => {
     const client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
+      process.env.GOOGLE_REDIRECT_URI,
     );
 
     // 1. Đổi code lấy Tokens
@@ -61,69 +67,124 @@ router.get('/google/callback', async (req, res) => {
     // 3. ĐỒNG BỘ DANH SÁCH VIDEO NGAY TẠI ĐÂY (TRƯỚC KHI CHUYỂN HƯỚNG VỀ FRONTEND)
     let initialVideos = [];
     try {
-      const youtube = google.youtube({ version: 'v3', auth: client });
+      const youtube = google.youtube({ version: "v3", auth: client });
       if (channelInfo.uploadsPlaylistId) {
         const playlistRes = await youtube.playlistItems.list({
-          part: ['snippet', 'contentDetails'],
+          part: ["snippet", "contentDetails"],
           playlistId: channelInfo.uploadsPlaylistId,
-          maxResults: 50
+          maxResults: 50,
         });
 
-        const videoIds = playlistRes.data.items?.map(it => it.contentDetails.videoId) || [];
+        const videoIds =
+          playlistRes.data.items?.map((it) => it.contentDetails.videoId) || [];
         if (videoIds.length > 0) {
           const videosRes = await youtube.videos.list({
-            part: ['snippet', 'statistics', 'contentDetails'],
-            id: videoIds
+            part: ["snippet", "statistics", "contentDetails", "status"],
+            id: videoIds,
           });
 
-          initialVideos = videosRes.data.items?.map(v => {
-            const durationIso = v.contentDetails.duration;
-            const durationFormatted = formatDuration(durationIso);
-            const isShorts = durationFormatted.includes("0:") || (parseInt(v.contentDetails.duration.match(/\d+S/)?.[0] || "0") < 60 && !durationIso.includes("M"));
-            const viewCount = parseInt(v.statistics.viewCount || "0");
+          initialVideos =
+            videosRes.data.items?.map((v) => {
+              const durationIso = v.contentDetails.duration;
+              const durationFormatted = formatDuration(durationIso);
+              const isShorts =
+                durationFormatted.includes("0:") ||
+                (parseInt(v.contentDetails.duration.match(/\d+S/)?.[0] || "0") <
+                  60 &&
+                  !durationIso.includes("M"));
+              const viewCount = parseInt(v.statistics.viewCount || "0");
+              const privacy = v.status?.privacyStatus;
+              const statusText = privacy === 'public'
+                ? 'Công khai'
+                : privacy === 'unlisted'
+                  ? 'Không công khai'
+                  : privacy === 'private'
+                    ? 'Riêng tư'
+                    : 'Công khai';
 
-            return {
-              id: v.id,
-              title: v.snippet.title,
-              type: isShorts ? "shorts" : "long",
-              duration: durationFormatted,
-              publishDate: new Date(v.snippet.publishedAt).toLocaleDateString('vi-VN'),
-              status: v.status?.privacyStatus === 'public' ? 'Công khai' : 'Không công khai',
-              category: "Nội dung",
-              thumb: v.snippet.thumbnails?.maxres?.url || v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.default?.url,
-              views: viewCount,
-              impressions: viewCount * 10,
-              ctr: 7.2,
-              retention: 46.5,
-              watchTimeHours: Math.round(viewCount * 0.08),
-              avgDurationSec: "4m 12s",
-              tags: v.snippet.tags || [],
-              description: v.snippet.description || "",
-              traffic: { suggested: 50, search: 30, browse: 15, other: 5 },
-              realtime48h: Array.from({ length: 24 }, () => Math.floor(Math.random() * 500) + 50)
-            };
-          }) || [];
+              return {
+                id: v.id,
+                title: v.snippet.title,
+                type: isShorts ? "shorts" : "long",
+                duration: durationFormatted,
+                publishDate: new Date(v.snippet.publishedAt).toLocaleDateString(
+                  "vi-VN",
+                ),
+                status: statusText,
+                category: getCategoryName(v.snippet?.categoryId),
+                thumb:
+                  v.snippet.thumbnails?.maxres?.url ||
+                  v.snippet.thumbnails?.high?.url ||
+                  v.snippet.thumbnails?.default?.url,
+                views: viewCount,
+                impressions: null,
+                ctr: null,
+                retention: null,
+                watchTimeHours: null,
+                avgDurationSec: null,
+                tags: v.snippet.tags || [],
+                description: v.snippet.description || "",
+                traffic: null,
+                realtime48h: null,
+              };
+            }) || [];
         }
       }
     } catch (syncErr) {
       console.warn("Lỗi khi kéo video ban đầu:", syncErr.message);
     }
 
-    // 4. Lưu Kênh kèm Toàn bộ Video vào DB
+    // 4. Tính toán hệ quy chiếu chuẩn nếu đã có video có lượt xem thực tế
+    const activeVideos = initialVideos.filter((v) => v.views > 0);
+    if (activeVideos.length > 0 && channelInfo.benchmarks) {
+      const avgCtr = parseFloat(
+        (
+          activeVideos.reduce((a, b) => a + (b.ctr || 0), 0) /
+          activeVideos.length
+        ).toFixed(1),
+      );
+      const avgRetention = parseFloat(
+        (
+          activeVideos.reduce((a, b) => a + (b.retention || 0), 0) /
+          activeVideos.length
+        ).toFixed(1),
+      );
+      const totalViews = initialVideos.reduce((a, b) => a + (b.views || 0), 0);
+
+      channelInfo.benchmarks.avgCtr = avgCtr;
+      channelInfo.benchmarks.targetCtr = parseFloat((avgCtr + 1.0).toFixed(1));
+      channelInfo.benchmarks.avgRetention = avgRetention;
+      channelInfo.benchmarks.targetRetention = parseFloat(
+        (avgRetention + 5.0).toFixed(1),
+      );
+      channelInfo.benchmarks.views28d = totalViews.toLocaleString();
+    } else if (channelInfo.benchmarks) {
+      channelInfo.benchmarks.avgCtr = 0;
+      channelInfo.benchmarks.targetCtr = 0;
+      channelInfo.benchmarks.avgRetention = 0;
+      channelInfo.benchmarks.targetRetention = 0;
+      channelInfo.benchmarks.views28d = "0";
+    }
+
+    // 5. Lưu Kênh kèm Toàn bộ Video vào DB
     const saved = await db.saveChannel({
       ...channelInfo,
       videos: initialVideos,
       tokens: {
         refresh_token: tokens.refresh_token,
-        access_token: tokens.access_token
-      }
+        access_token: tokens.access_token,
+      },
     });
 
     // 5. Chuyển hướng kèm channelId để Frontend tự động chọn và hiển thị ngay
-    res.redirect(`${clientUrl}?channel_connected=${encodeURIComponent(channelInfo.name)}&selected_id=${saved.id || channelInfo.channelId}`);
+    res.redirect(
+      `${clientUrl}?channel_connected=${encodeURIComponent(channelInfo.name)}&selected_id=${saved.id || channelInfo.channelId}`,
+    );
   } catch (error) {
     console.error("Lỗi Google OAuth Callback:", error);
-    res.redirect(`${clientUrl}?error=${encodeURIComponent(error.message || "oauth_failed")}`);
+    res.redirect(
+      `${clientUrl}?error=${encodeURIComponent(error.message || "oauth_failed")}`,
+    );
   }
 });
 
@@ -132,8 +193,12 @@ function formatDuration(iso) {
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return "00:00";
   const hours = match[1] ? `${match[1]}:` : "";
-  const minutes = match[2] ? (match[1] ? match[2].padStart(2, '0') : match[2]) : "0";
-  const seconds = match[3] ? match[3].padStart(2, '0') : "00";
+  const minutes = match[2]
+    ? match[1]
+      ? match[2].padStart(2, "0")
+      : match[2]
+    : "0";
+  const seconds = match[3] ? match[3].padStart(2, "0") : "00";
   return `${hours}${minutes}:${seconds}`;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import BenchmarkSection from './components/BenchmarkSection';
@@ -24,6 +24,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+  const syncedChannelsRef = useRef(new Set());
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -67,6 +68,7 @@ export default function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error && error !== 'invalid_grant') {
       showToast(`⚠️ Lỗi liên kết: ${error}`);
+      loadChannels();
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       loadChannels();
@@ -88,8 +90,9 @@ export default function App() {
       });
       setVideos(data);
 
-      // TỰ ĐỘNG KÍCH HOẠT ĐỒNG BỘ NẾU KÊNH CHƯA CÓ VIDEO (KHÔNG CẦN F5!)
-      if (data.length === 0 && !searchQuery) {
+      // TỰ ĐỘNG KÍCH HOẠT ĐỒNG BỘ 1 LẦN NẾU KÊNH CHƯA CÓ VIDEO (KHÔNG LOOP)
+      if (data.length === 0 && !searchQuery && !syncedChannelsRef.current.has(activeChannelId)) {
+        syncedChannelsRef.current.add(activeChannelId);
         const currentChannel = channels.find(c => c.id === activeChannelId || c.channelId === activeChannelId);
         if (currentChannel && currentChannel.tokens?.refresh_token !== "imported_public_channel") {
           setIsSyncing(true);

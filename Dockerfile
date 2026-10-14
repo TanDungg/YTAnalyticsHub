@@ -1,4 +1,4 @@
-﻿# ==============================================================
+# ==============================================================
 # Dockerfile cho Hugging Face Spaces (Port 7860)
 # ==============================================================
 
@@ -23,6 +23,7 @@ RUN cd backend && npm install --production
 
 COPY backend ./backend
 COPY --from=builder /app/frontend/dist ./frontend/dist
+RUN mkdir -p /app/data
 
 WORKDIR /app/backend
 

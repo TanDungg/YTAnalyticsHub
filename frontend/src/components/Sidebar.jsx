@@ -28,6 +28,7 @@ export default function Sidebar({ channels, activeChannelId, onSelectChannel, on
         ) : (
           channels.map((channel) => {
             const isActive = channel.id === activeChannelId || channel.channelId === activeChannelId;
+            const videoCount = channel.videos?.length || 0;
             return (
               <div
                 key={channel.id}
@@ -39,23 +40,23 @@ export default function Sidebar({ channels, activeChannelId, onSelectChannel, on
                   {isActive && <span className="active-indicator"></span>}
                 </div>
                 <div className="channel-text">
-                  <div className="channel-name">{channel.name}</div>
+                  <div className="channel-name" title={channel.name}>{channel.name}</div>
                   <div className="channel-meta">
                     <span>{channel.benchmarks?.subscribers || '0'} subs</span>
                     <span>•</span>
-                    <span>{channel.videos?.length || 0} videos</span>
+                    <span>{videoCount} {videoCount === 1 ? 'video' : 'videos'}</span>
                   </div>
                 </div>
               </div>
             );
           })
         )}
-      </div>
 
-      <button className="btn-add-channel" onClick={onOpenConnectModal}>
-        <PlusCircle size={16} />
-        <span>Thêm kênh mới</span>
-      </button>
+        <button className="btn-add-channel" onClick={onOpenConnectModal}>
+          <PlusCircle size={16} />
+          <span>Thêm kênh mới</span>
+        </button>
+      </div>
 
       <div className="sidebar-footer">
         <div className="status-indicator">

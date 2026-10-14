@@ -17,7 +17,7 @@ export const SCOPES = [
 export const getAuthUrl = () => {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
-    prompt: "consent",
+    prompt: "consent select_account",
     scope: SCOPES,
   });
 };
