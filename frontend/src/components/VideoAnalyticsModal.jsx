@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import {
-  X, BarChart3, Globe, Filter, TrendingUp, BarChart2, PieChart, Tag, Copy, FileText
+  X, BarChart3, Globe, Filter, TrendingUp, BarChart2, PieChart, Tag, Copy, FileText, RefreshCw
 } from 'lucide-react';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import {
@@ -30,7 +30,7 @@ ChartJS.register(
   Filler
 );
 
-export default function VideoAnalyticsModal({ video, benchmark, onClose, showToast }) {
+export default function VideoAnalyticsModal({ video, benchmark, onClose, onSync, isSyncing, showToast }) {
   useEffect(() => {
     document.body.classList.add('modal-open');
     const handleKeyDown = (e) => {
@@ -54,9 +54,9 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
   const ctrDiff = hasBenchmark && hasCtr ? (video.ctr - benchmark.avgCtr).toFixed(1) : null;
   const retDiff = hasBenchmark && hasRetention ? (video.retention - benchmark.avgRetention).toFixed(1) : null;
 
-  let evalBadge = "CHƯA CÓ DỮ LIỆU PHÂN TÍCH";
+  let evalBadge = "CHƯA PHÁT SINH LƯỢT XEM";
   let evalBg = "var(--text-muted)";
-  let evalText = "Video này hiện chưa có đủ dữ liệu phân tích từ YouTube. Các chỉ số CTR, % Giữ chân và phễu chuyển đổi sẽ hiển thị đầy đủ khi video phát sinh lượt xem.";
+  let evalText = "Video này chưa ghi nhận lượt xem trên YouTube API. Nếu trên YouTube vừa có người xem mới, hãy bấm nút 'Làm mới số liệu' để cập nhật.";
 
   if (hasViews && hasRetention) {
     if (hasCtr) {
@@ -88,6 +88,10 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
         evalText = `Tỷ lệ giữ chân đạt ${video.retention}% (${retDiff || 0}% so với chuẩn kênh). Cần cải thiện đoạn Hook 30 giây đầu để giữ chân khán giả lâu hơn.`;
       }
     }
+  } else if (hasViews && !hasRetention) {
+    evalBadge = "ĐANG CHỜ YOUTUBE XỬ LÝ (24-48H)";
+    evalBg = "var(--neon-amber)";
+    evalText = `Đã ghi nhận ${video.views.toLocaleString()} lượt xem thực tế! Đối với video mới xuất bản, YouTube Analytics cần từ 24 đến 48 giờ để xử lý và tổng hợp các báo cáo chuyên sâu (% Giữ chân, Thời lượng xem trung bình AVD).`;
   }
 
   // Retention Chart Config
@@ -182,9 +186,37 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
             </span>
             <h2 className="modal-title">{video.title}</h2>
           </div>
-          <button className="btn-close-modal" onClick={onClose} title="Đóng (ESC)">
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {onSync && (
+              <button 
+                type="button"
+                className="btn-sync-modal" 
+                onClick={onSync} 
+                disabled={isSyncing} 
+                title="Làm mới lượt xem và số liệu từ YouTube"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  color: 'var(--neon-cyan)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: isSyncing ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
+                <span>{isSyncing ? 'Đang cập nhật...' : 'Làm mới số liệu'}</span>
+              </button>
+            )}
+            <button className="btn-close-modal" onClick={onClose} title="Đóng (ESC)">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="modal-body">

@@ -90,17 +90,20 @@ export default function App() {
       });
       setVideos(data);
 
-      // TỰ ĐỘNG KÍCH HOẠT ĐỒNG BỘ 1 LẦN NẾU KÊNH CHƯA CÓ VIDEO (KHÔNG LOOP)
-      if (data.length === 0 && !searchQuery && !syncedChannelsRef.current.has(activeChannelId)) {
+      // TỰ ĐỘNG ĐỒNG BỘ 1 LẦN KHI CHỌN KÊNH ĐỂ CẬP NHẬT LƯỢT XEM MỚI NHẤT TỪ YOUTUBE
+      if (!searchQuery && !syncedChannelsRef.current.has(activeChannelId)) {
         syncedChannelsRef.current.add(activeChannelId);
         const currentChannel = channels.find(c => c.id === activeChannelId || c.channelId === activeChannelId);
         if (currentChannel && currentChannel.tokens?.refresh_token !== "imported_public_channel") {
           setIsSyncing(true);
           syncChannelVideos(activeChannelId).then(res => {
-            if (res.videos && res.videos.length > 0) {
+            if (res.videos) {
               setVideos(res.videos);
+              setSelectedVideo(prev => prev ? res.videos.find(v => v.id === prev.id) || prev : null);
               loadChannels(activeChannelId);
             }
+          }).catch(err => {
+            console.warn("Lỗi tự động đồng bộ kênh:", err.message);
           }).finally(() => {
             setIsSyncing(false);
           });
@@ -122,9 +125,14 @@ export default function App() {
     if (!activeChannelId) return;
     try {
       setIsSyncing(true);
-      showToast("Đang đồng bộ số liệu mới nhất từ YouTube Data API...");
+      showToast("Đang đồng bộ số liệu mới nhất từ YouTube...");
       const res = await syncChannelVideos(activeChannelId);
-      setVideos(res.videos || []);
+      const updatedVideos = res.videos || [];
+      setVideos(updatedVideos);
+      if (selectedVideo) {
+        const refreshed = updatedVideos.find(v => v.id === selectedVideo.id);
+        if (refreshed) setSelectedVideo(refreshed);
+      }
       await loadChannels(activeChannelId);
       showToast(`Đồng bộ thành công ${res.count || 0} video!`);
     } catch (err) {
@@ -249,6 +257,8 @@ export default function App() {
           video={selectedVideo}
           benchmark={activeChannel?.benchmarks}
           onClose={() => setSelectedVideo(null)}
+          onSync={handleSync}
+          isSyncing={isSyncing}
           showToast={showToast}
         />
       )}
