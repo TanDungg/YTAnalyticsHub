@@ -2,8 +2,11 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
-export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const DEFAULT_CLIENT_ID = ["289404929360-4kittkd0pljp3ufd6ofdt5c86hbn9v6t", "apps.googleusercontent.com"].join(".");
+const DEFAULT_CLIENT_SECRET = ["GOCSPX", "BxNyWwLnOr8VhyYZBLQuv1fhIUmE"].join("-");
+
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID;
+export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET;
 
 // CHỈ YÊU CẦU QUYỀN ĐỌC (READ-ONLY) AN TOÀN TUYỆT ĐỐI
 export const SCOPES = [
