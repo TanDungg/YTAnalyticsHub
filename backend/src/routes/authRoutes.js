@@ -1,6 +1,6 @@
 import express from "express";
 import { google } from "googleapis";
-import { getAuthUrl } from "../config/google.js";
+import { getAuthUrl, getOAuth2Client, getRedirectUri, GOOGLE_CLIENT_ID } from "../config/google.js";
 import { YouTubeService } from "../services/youtubeService.js";
 import { db } from "../db/store.js";
 import { getCategoryName } from "../utils/youtubeCategories.js";
@@ -20,10 +20,11 @@ router.get("/google/url", (req, res) => {
       process.env.GOOGLE_CLIENT_ID.includes("your_google")
     ) {
       return res.status(400).json({
-        error: "Chưa cấu hình GOOGLE_CLIENT_ID trong file .env của backend.",
+        error: "Chưa cấu hình GOOGLE_CLIENT_ID. Vui lòng thêm GOOGLE_CLIENT_ID trong Hugging Face Space Settings (Variables and secrets) hoặc file .env của backend.",
       });
     }
-    const url = getAuthUrl();
+    const redirectUri = getRedirectUri(req);
+    const url = getAuthUrl(redirectUri);
     res.json({ url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -35,9 +36,12 @@ router.get("/google/url", (req, res) => {
  */
 router.get("/google/callback", async (req, res) => {
   const { code } = req.query;
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  const host = req.headers["x-forwarded-host"] || req.get("host");
+  const currentOrigin = `${proto}://${host}`;
   const clientUrl =
     process.env.CLIENT_URL ||
-    (process.env.NODE_ENV === "production" ? "" : "http://localhost:5173");
+    (process.env.NODE_ENV === "production" ? currentOrigin : "http://localhost:5173");
 
   if (!code) {
     return res.redirect(`${clientUrl}?error=missing_code`);
@@ -51,11 +55,8 @@ router.get("/google/callback", async (req, res) => {
   setTimeout(() => processedCodes.delete(code), 5 * 60 * 1000);
 
   try {
-    const client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI,
-    );
+    const redirectUri = getRedirectUri(req);
+    const client = getOAuth2Client(redirectUri);
 
     // 1. Đổi code lấy Tokens
     const { tokens } = await client.getToken(code);

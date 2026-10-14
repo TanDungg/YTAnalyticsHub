@@ -1,12 +1,21 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-export const supabase = (supabaseUrl && supabaseKey)
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+let client = null;
+if (supabaseUrl && supabaseKey) {
+  try {
+    client = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false },
+    });
+  } catch (err) {
+    console.error("Lỗi khởi tạo Supabase Client:", err.message);
+  }
+}
+
+export const supabase = client;
 
 export const isSupabaseConfigured = () => Boolean(supabase);
