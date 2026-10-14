@@ -29,6 +29,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/channels', channelRoutes);
 
+import { isSupabaseConfigured, supabase, supabaseUrl, supabaseKey } from './db/supabase.js';
+
 app.get('/api/health', async (req, res) => {
   let sbTest = null;
   let sbError = null;
@@ -47,6 +49,9 @@ app.get('/api/health', async (req, res) => {
     isSupabaseConfigured: isSupabaseConfigured(),
     supabaseTestCount: sbTest ? sbTest.length : null,
     supabaseError: sbError,
+    supabaseUrlUsed: supabaseUrl,
+    supabaseKeyPrefix: supabaseKey ? supabaseKey.substring(0, 10) : null,
+    supabaseKeyLength: supabaseKey ? supabaseKey.length : 0,
     timestamp: new Date().toISOString()
   });
 });
