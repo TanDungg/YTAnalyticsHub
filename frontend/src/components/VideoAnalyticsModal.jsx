@@ -58,23 +58,35 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
   let evalBg = "var(--text-muted)";
   let evalText = "Video này hiện chưa có đủ dữ liệu phân tích từ YouTube. Các chỉ số CTR, % Giữ chân và phễu chuyển đổi sẽ hiển thị đầy đủ khi video phát sinh lượt xem.";
 
-  if (hasViews && hasCtr && hasRetention) {
-    if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr >= (benchmark?.avgCtr || 0)) {
-      evalBadge = "HIỆU SUẤT XUẤT SẮC";
-      evalBg = "var(--neon-emerald)";
-      evalText = `Cả CTR (+${ctrDiff || 0}%) và Giữ chân người xem (+${retDiff || 0}%) đều vượt chuẩn của kênh. Thuật toán YouTube đang đề xuất rất tích cực video này.`;
-    } else if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr < (benchmark?.avgCtr || 0)) {
-      evalBadge = "TIỀM NĂNG - CẦN ĐỔI THUMBNAIL";
-      evalBg = "var(--neon-amber)";
-      evalText = `Nội dung giữ chân người xem rất tốt (+${retDiff || 0}%), nhưng CTR thấp hơn chuẩn (${ctrDiff || 0}%). Thay đổi Thumbnail hoặc Tiêu đề hấp dẫn hơn sẽ giúp video bùng nổ view!`;
-    } else if (video.ctr >= (benchmark?.avgCtr || 0) && video.retention < (benchmark?.avgRetention || 0)) {
-      evalBadge = "CẨN THẬN CLICKBAIT";
-      evalBg = "var(--yt-red)";
-      evalText = `CTR cao (+${ctrDiff || 0}%) chứng tỏ Thumbnail hấp dẫn, nhưng người xem thoát sớm (${retDiff || 0}% so với chuẩn). Cần kiểm tra lại đoạn mở đầu (Hook) của video.`;
+  if (hasViews && hasRetention) {
+    if (hasCtr) {
+      if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr >= (benchmark?.avgCtr || 0)) {
+        evalBadge = "HIỆU SUẤT XUẤT SẮC";
+        evalBg = "var(--neon-emerald)";
+        evalText = `Cả CTR (+${ctrDiff || 0}%) và Giữ chân người xem (+${retDiff || 0}%) đều vượt chuẩn của kênh. Thuật toán YouTube đang đề xuất rất tích cực video này.`;
+      } else if (video.retention >= (benchmark?.avgRetention || 0) && video.ctr < (benchmark?.avgCtr || 0)) {
+        evalBadge = "TIỀM NĂNG - CẦN ĐỔI THUMBNAIL";
+        evalBg = "var(--neon-amber)";
+        evalText = `Nội dung giữ chân người xem rất tốt (+${retDiff || 0}%), nhưng CTR thấp hơn chuẩn (${ctrDiff || 0}%). Thay đổi Thumbnail hoặc Tiêu đề hấp dẫn hơn sẽ giúp video bùng nổ view!`;
+      } else if (video.ctr >= (benchmark?.avgCtr || 0) && video.retention < (benchmark?.avgRetention || 0)) {
+        evalBadge = "CẨN THẬN CLICKBAIT";
+        evalBg = "var(--yt-red)";
+        evalText = `CTR cao (+${ctrDiff || 0}%) chứng tỏ Thumbnail hấp dẫn, nhưng người xem thoát sớm (${retDiff || 0}% so với chuẩn). Cần kiểm tra lại đoạn mở đầu (Hook) của video.`;
+      } else {
+        evalBadge = "DƯỚI MỨC TRUNG BÌNH";
+        evalBg = "var(--text-muted)";
+        evalText = `Cả tỉ lệ click lẫn thời gian giữ chân đều chưa đạt ngưỡng trung bình của kênh. Cần tối ưu lại chủ đề cho các video sau.`;
+      }
     } else {
-      evalBadge = "DƯỚI MỨC TRUNG BÌNH";
-      evalBg = "var(--text-muted)";
-      evalText = `Cả tỉ lệ click lẫn thời gian giữ chân đều chưa đạt ngưỡng trung bình của kênh. Cần tối ưu lại chủ đề cho các video sau.`;
+      if (video.retention >= (benchmark?.avgRetention || 0)) {
+        evalBadge = "GIỮ CHÂN NGƯỜI XEM TỐT";
+        evalBg = "var(--neon-emerald)";
+        evalText = `Tỷ lệ giữ chân người xem đạt ${video.retention}% (${retDiff && Number(retDiff) >= 0 ? `+${retDiff}% ` : ''}so với chuẩn kênh). Khán giả đang xem rất kỹ nội dung này!`;
+      } else {
+        evalBadge = "CẦN TỐI ƯU ĐOẠN ĐẦU";
+        evalBg = "var(--neon-amber)";
+        evalText = `Tỷ lệ giữ chân đạt ${video.retention}% (${retDiff || 0}% so với chuẩn kênh). Cần cải thiện đoạn Hook 30 giây đầu để giữ chân khán giả lâu hơn.`;
+      }
     }
   }
 
@@ -228,7 +240,7 @@ export default function VideoAnalyticsModal({ video, benchmark, onClose, showToa
               <div className={`kpi-comp ${hasCtr && ctrDiff !== null && ctrDiff >= 0 ? '' : 'neg'}`}>
                 {hasCtr && hasBenchmark && ctrDiff !== null
                   ? `${ctrDiff >= 0 ? '+' : ''}${ctrDiff}% vs chuẩn kênh (${benchmark?.avgCtr}%)`
-                  : 'Chưa có'}
+                  : 'Chỉ có trong YouTube Studio'}
               </div>
             </div>
             <div className="kpi-box">

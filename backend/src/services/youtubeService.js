@@ -314,29 +314,122 @@ export class YouTubeService {
       };
     }) || [];
 
+    // Truy vấn số liệu thực tế từ YouTube Analytics API nếu kênh có xác thực OAuth
+    await YouTubeService.enrichVideosAndBenchmarksWithAnalytics(auth, parsedVideos, channel.benchmarks);
+
     const activeVideos = parsedVideos.filter(v => v.views > 0);
     if (activeVideos.length > 0 && channel.benchmarks) {
       const avgCtr = parseFloat((activeVideos.reduce((a, b) => a + (b.ctr || 0), 0) / activeVideos.length).toFixed(1));
-      const avgRetention = parseFloat((activeVideos.reduce((a, b) => a + (b.retention || 0), 0) / activeVideos.length).toFixed(1));
-      const totalViews = parsedVideos.reduce((a, b) => a + (b.views || 0), 0);
-
       channel.benchmarks.avgCtr = avgCtr;
-      channel.benchmarks.targetCtr = parseFloat((avgCtr + 1.0).toFixed(1));
-      channel.benchmarks.avgRetention = avgRetention;
-      channel.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
-      channel.benchmarks.views28d = totalViews.toLocaleString();
-      await db.saveChannel(channel);
-    } else if (channel.benchmarks) {
-      channel.benchmarks.avgCtr = 0;
-      channel.benchmarks.targetCtr = 0;
-      channel.benchmarks.avgRetention = 0;
-      channel.benchmarks.targetRetention = 0;
-      channel.benchmarks.views28d = "0";
+      channel.benchmarks.targetCtr = avgCtr > 0 ? parseFloat((avgCtr + 1.0).toFixed(1)) : 0;
+
+      // Nếu chưa có avgRetention từ cấp kênh thì tính trung bình từ các video có retention
+      if (!channel.benchmarks.avgRetention || channel.benchmarks.avgRetention === 0) {
+        const vidsWithRet = activeVideos.filter(v => typeof v.retention === 'number' && v.retention > 0);
+        if (vidsWithRet.length > 0) {
+          const avgRetention = parseFloat((vidsWithRet.reduce((a, b) => a + b.retention, 0) / vidsWithRet.length).toFixed(1));
+          channel.benchmarks.avgRetention = avgRetention;
+          channel.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
+        }
+      }
+
+      if (!channel.benchmarks.views28d || channel.benchmarks.views28d === "0") {
+        const totalViews = parsedVideos.reduce((a, b) => a + (b.views || 0), 0);
+        channel.benchmarks.views28d = totalViews.toLocaleString();
+      }
       await db.saveChannel(channel);
     }
 
     await db.updateVideos(channel.id, parsedVideos);
     return parsedVideos;
+  }
+
+  /**
+   * Truy vấn số liệu thực tế từ YouTube Analytics API
+   */
+  static async enrichVideosAndBenchmarksWithAnalytics(auth, parsedVideos, benchmarks) {
+    if (!auth || !benchmarks) return;
+
+    try {
+      const ytAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate28 = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      // 1. Chỉ số tổng quan kênh 28 ngày qua
+      try {
+        const channelReport = await ytAnalytics.reports.query({
+          ids: 'channel==MINE',
+          startDate: startDate28,
+          endDate: endDate,
+          metrics: 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost'
+        });
+
+        if (channelReport.data.rows && channelReport.data.rows.length > 0) {
+          const [views28, minsWatched28, avgDurSec, avgRetPct, subsGained, subsLost] = channelReport.data.rows[0];
+          if (typeof avgRetPct === 'number' && avgRetPct > 0) {
+            benchmarks.avgRetention = parseFloat(avgRetPct.toFixed(1));
+            benchmarks.targetRetention = parseFloat((avgRetPct + 5.0).toFixed(1));
+          }
+          if (typeof views28 === 'number' && views28 > 0) {
+            benchmarks.views28d = views28.toLocaleString();
+          }
+          const netSubs = (subsGained || 0) - (subsLost || 0);
+          benchmarks.subsTrend = `${netSubs >= 0 ? '+' : ''}${netSubs}`;
+          if (avgDurSec > 0) {
+            const m = Math.floor(avgDurSec / 60);
+            const s = Math.round(avgDurSec % 60);
+            benchmarks.avgDuration = `${m}m ${s}s`;
+          }
+        }
+      } catch (cErr) {
+        console.warn("YouTube Analytics kênh:", cErr.message);
+      }
+
+      // 2. Dữ liệu thời gian xem và Retention cho từng video
+      try {
+        const videoReport = await ytAnalytics.reports.query({
+          ids: 'channel==MINE',
+          startDate: '2024-01-01',
+          endDate: endDate,
+          dimensions: 'video',
+          metrics: 'views,estimatedMinutesWatched,likes,subscribersGained',
+          maxResults: 50,
+          sort: '-views'
+        });
+
+        if (videoReport.data.rows) {
+          const statsMap = new Map();
+          for (const row of videoReport.data.rows) {
+            statsMap.set(row[0], {
+              views: row[1],
+              mins: row[2],
+              likes: row[3],
+              subs: row[4]
+            });
+          }
+
+          for (const v of parsedVideos) {
+            const s = statsMap.get(v.id);
+            if (s) {
+              v.watchTimeHours = parseFloat((s.mins / 60).toFixed(1));
+              if (s.views > 0 && v.duration) {
+                const parts = v.duration.split(':').map(Number);
+                const durSec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts.length === 2 ? parts[0] * 60 + parts[1] : 0);
+                if (durSec > 0) {
+                  const avgSec = Math.round((s.mins * 60) / s.views);
+                  v.avgDurationSec = `${Math.floor(avgSec / 60)}:${String(avgSec % 60).padStart(2, '0')}`;
+                  v.retention = Math.min(100, parseFloat(((avgSec / durSec) * 100).toFixed(1)));
+                }
+              }
+            }
+          }
+        }
+      } catch (vErr) {
+        console.warn("YouTube Analytics video:", vErr.message);
+      }
+    } catch (err) {
+      console.warn("Lỗi kết nối YouTube Analytics:", err.message);
+    }
   }
 }
 

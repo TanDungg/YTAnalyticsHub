@@ -135,7 +135,9 @@ router.get("/google/callback", async (req, res) => {
       console.warn("Lỗi khi kéo video ban đầu:", syncErr.message);
     }
 
-    // 4. Tính toán hệ quy chiếu chuẩn nếu đã có video có lượt xem thực tế
+    // 4. Lấy dữ liệu YouTube Analytics thực tế (28 ngày qua & từng video)
+    await YouTubeService.enrichVideosAndBenchmarksWithAnalytics(client, initialVideos, channelInfo.benchmarks);
+
     const activeVideos = initialVideos.filter((v) => v.views > 0);
     if (activeVideos.length > 0 && channelInfo.benchmarks) {
       const avgCtr = parseFloat(
@@ -144,27 +146,22 @@ router.get("/google/callback", async (req, res) => {
           activeVideos.length
         ).toFixed(1),
       );
-      const avgRetention = parseFloat(
-        (
-          activeVideos.reduce((a, b) => a + (b.retention || 0), 0) /
-          activeVideos.length
-        ).toFixed(1),
-      );
-      const totalViews = initialVideos.reduce((a, b) => a + (b.views || 0), 0);
-
       channelInfo.benchmarks.avgCtr = avgCtr;
-      channelInfo.benchmarks.targetCtr = parseFloat((avgCtr + 1.0).toFixed(1));
-      channelInfo.benchmarks.avgRetention = avgRetention;
-      channelInfo.benchmarks.targetRetention = parseFloat(
-        (avgRetention + 5.0).toFixed(1),
-      );
-      channelInfo.benchmarks.views28d = totalViews.toLocaleString();
-    } else if (channelInfo.benchmarks) {
-      channelInfo.benchmarks.avgCtr = 0;
-      channelInfo.benchmarks.targetCtr = 0;
-      channelInfo.benchmarks.avgRetention = 0;
-      channelInfo.benchmarks.targetRetention = 0;
-      channelInfo.benchmarks.views28d = "0";
+      channelInfo.benchmarks.targetCtr = avgCtr > 0 ? parseFloat((avgCtr + 1.0).toFixed(1)) : 0;
+
+      if (!channelInfo.benchmarks.avgRetention || channelInfo.benchmarks.avgRetention === 0) {
+        const vidsWithRet = activeVideos.filter(v => typeof v.retention === 'number' && v.retention > 0);
+        if (vidsWithRet.length > 0) {
+          const avgRetention = parseFloat((vidsWithRet.reduce((a, b) => a + b.retention, 0) / vidsWithRet.length).toFixed(1));
+          channelInfo.benchmarks.avgRetention = avgRetention;
+          channelInfo.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
+        }
+      }
+
+      if (!channelInfo.benchmarks.views28d || channelInfo.benchmarks.views28d === "0") {
+        const totalViews = initialVideos.reduce((a, b) => a + (b.views || 0), 0);
+        channelInfo.benchmarks.views28d = totalViews.toLocaleString();
+      }
     }
 
     // 5. Lưu Kênh kèm Toàn bộ Video vào DB

@@ -60,12 +60,12 @@ export default function BenchmarkSection({ benchmarks }) {
               {hasCtr ? (
                 <>Mục tiêu &gt; <strong>{benchmarks.targetCtr}%</strong></>
               ) : (
-                'Cần tối thiểu 1 video'
+                'Chỉ có trong YouTube Studio'
               )}
             </span>
           </div>
           <div className="card-footer-info">
-            {hasCtr ? 'Thước đo sức hút Thumbnail & Tiêu đề' : 'Chưa có video để tính toán'}
+            {hasCtr ? 'Thước đo sức hút Thumbnail & Tiêu đề' : 'Google API không hỗ trợ xuất CTR tự động'}
           </div>
         </div>
 
@@ -80,12 +80,12 @@ export default function BenchmarkSection({ benchmarks }) {
               {hasRetention ? (
                 <>Mục tiêu &gt; <strong>{benchmarks.targetRetention}%</strong></>
               ) : (
-                'Cần tối thiểu 1 video'
+                'Đang cập nhật từ Analytics'
               )}
             </span>
           </div>
           <div className="card-footer-info">
-            {hasRetention ? 'Thước đo chất lượng nội dung video' : 'Chưa có video để tính toán'}
+            {hasRetention ? 'Thước đo chất lượng nội dung video' : 'Cần phát sinh lượt xem để YouTube Analytics ghi nhận'}
           </div>
         </div>
       </div>

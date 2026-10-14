@@ -48,7 +48,7 @@ export default function VideoCard({ video, benchmark, onSelect }) {
                   )}
                 </>
               ) : (
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Chưa có</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }} title="YouTube chỉ cung cấp chỉ số CTR hiển thị trong YouTube Studio">Chưa có</span>
               )}
             </div>
           </div>
