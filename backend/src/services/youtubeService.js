@@ -20,6 +20,28 @@ function getPublishedTimestamp(video) {
   return 0;
 }
 
+export async function getLiveWatchPageViews(videoId) {
+  if (!videoId) return null;
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7'
+      },
+      signal: AbortSignal.timeout(4000)
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const m = html.match(/"viewCount":"(\d+)"/);
+    if (m && m[1]) {
+      return parseInt(m[1], 10);
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export class YouTubeService {
   /**
    * CÁCH 2: NHẬP KÊNH SIÊU TỐC QUA LINK / @HANDLE / CHANNEL ID
@@ -342,6 +364,20 @@ export class YouTubeService {
         realtime48h: null
       };
     }) || [];
+
+    // Đồng bộ số view thời gian thực từ YouTube Watch Page (khắc phục độ trễ cache 15-60 phút của Google Data API v3)
+    try {
+      await Promise.all(
+        parsedVideos.slice(0, 10).map(async (v) => {
+          const liveViews = await getLiveWatchPageViews(v.id);
+          if (typeof liveViews === 'number' && liveViews > v.views) {
+            v.views = liveViews;
+          }
+        })
+      );
+    } catch (liveErr) {
+      console.warn("Lỗi kiểm tra live view:", liveErr.message);
+    }
 
     // Truy vấn số liệu thực tế từ YouTube Analytics API nếu kênh có xác thực OAuth
     await YouTubeService.enrichVideosAndBenchmarksWithAnalytics(auth, parsedVideos, channel.benchmarks);

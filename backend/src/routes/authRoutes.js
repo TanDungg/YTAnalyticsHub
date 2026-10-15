@@ -1,7 +1,7 @@
 import express from "express";
 import { google } from "googleapis";
 import { getAuthUrl, getOAuth2Client, getRedirectUri, GOOGLE_CLIENT_ID } from "../config/google.js";
-import { YouTubeService } from "../services/youtubeService.js";
+import { YouTubeService, getLiveWatchPageViews } from "../services/youtubeService.js";
 import { db } from "../db/store.js";
 import { getCategoryName } from "../utils/youtubeCategories.js";
 
@@ -133,6 +133,20 @@ router.get("/google/callback", async (req, res) => {
       }
     } catch (syncErr) {
       console.warn("Lỗi khi kéo video ban đầu:", syncErr.message);
+    }
+
+    // Đồng bộ số view thời gian thực từ YouTube Watch Page (khắc phục độ trễ cache 15-60 phút của Google Data API v3)
+    try {
+      await Promise.all(
+        initialVideos.slice(0, 10).map(async (v) => {
+          const liveViews = await getLiveWatchPageViews(v.id);
+          if (typeof liveViews === 'number' && liveViews > v.views) {
+            v.views = liveViews;
+          }
+        })
+      );
+    } catch (liveErr) {
+      console.warn("Lỗi kiểm tra live view:", liveErr.message);
     }
 
     // 4. Lấy dữ liệu YouTube Analytics thực tế (28 ngày qua & từng video)
