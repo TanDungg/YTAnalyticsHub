@@ -100,6 +100,9 @@ export default function App() {
             if (res.videos) {
               setVideos(res.videos);
               setSelectedVideo(prev => prev ? res.videos.find(v => v.id === prev.id) || prev : null);
+              if (res.channel) {
+                setChannels(prev => prev.map(c => (c.id === res.channel.id || c.channelId === res.channel.channelId) ? res.channel : c));
+              }
               loadChannels(activeChannelId);
             }
           }).catch(err => {
@@ -129,6 +132,9 @@ export default function App() {
       const res = await syncChannelVideos(activeChannelId);
       const updatedVideos = res.videos || [];
       setVideos(updatedVideos);
+      if (res.channel) {
+        setChannels(prev => prev.map(c => (c.id === res.channel.id || c.channelId === res.channel.channelId) ? res.channel : c));
+      }
       if (selectedVideo) {
         const refreshed = updatedVideos.find(v => v.id === selectedVideo.id);
         if (refreshed) setSelectedVideo(refreshed);
@@ -224,6 +230,7 @@ export default function App() {
 
             <BenchmarkSection
               benchmarks={activeChannel?.benchmarks}
+              videos={videos}
             />
 
             <VideoExplorer

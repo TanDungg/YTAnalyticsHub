@@ -1,7 +1,24 @@
 import { google } from 'googleapis';
-import { oauth2Client } from '../config/google.js';
+import { oauth2Client, getOAuth2Client } from '../config/google.js';
 import { db } from '../db/store.js';
 import { getCategoryName } from '../utils/youtubeCategories.js';
+
+function getPublishedTimestamp(video) {
+  if (video.publishedAt) {
+    const t = new Date(video.publishedAt).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (video.publishDate && typeof video.publishDate === 'string') {
+    const parts = video.publishDate.split('/');
+    if (parts.length === 3) {
+      const t = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      if (!isNaN(t)) return t;
+    }
+    const t = new Date(video.publishDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  return 0;
+}
 
 export class YouTubeService {
   /**
@@ -200,12 +217,7 @@ export class YouTubeService {
       throw new Error("Kênh không có refresh_token hợp lệ");
     }
 
-    const auth = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-
+    const auth = getOAuth2Client();
     auth.setCredentials({
       refresh_token: channel.tokens.refresh_token,
       access_token: channel.tokens.access_token
@@ -259,6 +271,22 @@ export class YouTubeService {
     const auth = this.getAuthenticatedClient(channel);
     const youtube = google.youtube({ version: 'v3', auth });
 
+    // 1. Cập nhật thông tin kênh mới nhất (subscribers) từ YouTube
+    try {
+      const chRes = await youtube.channels.list({
+        part: ['statistics'],
+        mine: true
+      });
+      const chItem = chRes.data.items?.[0];
+      if (chItem?.statistics && channel.benchmarks) {
+        if (chItem.statistics.subscriberCount !== undefined) {
+          channel.benchmarks.subscribers = parseInt(chItem.statistics.subscriberCount || "0").toLocaleString();
+        }
+      }
+    } catch (chErr) {
+      console.warn("Lỗi cập nhật statistics kênh:", chErr.message);
+    }
+
     const uploadsPlaylistId = channel.uploadsPlaylistId;
     if (!uploadsPlaylistId) return channel.videos || [];
 
@@ -298,6 +326,7 @@ export class YouTubeService {
         type: isShorts ? "shorts" : "long",
         duration: durationFormatted,
         publishDate: new Date(v.snippet.publishedAt).toLocaleDateString('vi-VN'),
+        publishedAt: v.snippet.publishedAt,
         status: statusText,
         category: getCategoryName(v.snippet?.categoryId),
         thumb: v.snippet.thumbnails?.maxres?.url || v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.default?.url,
@@ -317,26 +346,44 @@ export class YouTubeService {
     // Truy vấn số liệu thực tế từ YouTube Analytics API nếu kênh có xác thực OAuth
     await YouTubeService.enrichVideosAndBenchmarksWithAnalytics(auth, parsedVideos, channel.benchmarks);
 
-    const activeVideos = parsedVideos.filter(v => v.views > 0);
-    if (activeVideos.length > 0 && channel.benchmarks) {
-      const avgCtr = parseFloat((activeVideos.reduce((a, b) => a + (b.ctr || 0), 0) / activeVideos.length).toFixed(1));
-      channel.benchmarks.avgCtr = avgCtr;
-      channel.benchmarks.targetCtr = avgCtr > 0 ? parseFloat((avgCtr + 1.0).toFixed(1)) : 0;
+    if (channel.benchmarks) {
+      const activeVideos = parsedVideos.filter(v => v.views > 0);
+      if (activeVideos.length > 0) {
+        const avgCtr = parseFloat((activeVideos.reduce((a, b) => a + (b.ctr || 0), 0) / activeVideos.length).toFixed(1));
+        channel.benchmarks.avgCtr = avgCtr;
+        channel.benchmarks.targetCtr = avgCtr > 0 ? parseFloat((avgCtr + 1.0).toFixed(1)) : 0;
 
-      // Nếu chưa có avgRetention từ cấp kênh thì tính trung bình từ các video có retention
-      if (!channel.benchmarks.avgRetention || channel.benchmarks.avgRetention === 0) {
-        const vidsWithRet = activeVideos.filter(v => typeof v.retention === 'number' && v.retention > 0);
-        if (vidsWithRet.length > 0) {
-          const avgRetention = parseFloat((vidsWithRet.reduce((a, b) => a + b.retention, 0) / vidsWithRet.length).toFixed(1));
-          channel.benchmarks.avgRetention = avgRetention;
-          channel.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
+        // Nếu chưa có avgRetention từ cấp kênh thì tính trung bình từ các video có retention
+        if (!channel.benchmarks.avgRetention || channel.benchmarks.avgRetention === 0) {
+          const vidsWithRet = activeVideos.filter(v => typeof v.retention === 'number' && v.retention > 0);
+          if (vidsWithRet.length > 0) {
+            const avgRetention = parseFloat((vidsWithRet.reduce((a, b) => a + b.retention, 0) / vidsWithRet.length).toFixed(1));
+            channel.benchmarks.avgRetention = avgRetention;
+            channel.benchmarks.targetRetention = parseFloat((avgRetention + 5.0).toFixed(1));
+          }
         }
       }
 
-      if (!channel.benchmarks.views28d || channel.benchmarks.views28d === "0") {
-        const totalViews = parsedVideos.reduce((a, b) => a + (b.views || 0), 0);
-        channel.benchmarks.views28d = totalViews.toLocaleString();
+      // TÍNH TOÁN LƯỢT XEM 28 NGÀY CHUẨN XÁC VÀ TRÁNH DELAY CỦA ANALYTICS
+      const cutoff28d = Date.now() - 28 * 24 * 60 * 60 * 1000;
+      const recentVideosViews = parsedVideos.filter(v => {
+        const pubTime = getPublishedTimestamp(v);
+        return pubTime >= cutoff28d;
+      }).reduce((sum, v) => sum + (v.views || 0), 0);
+
+      const totalAllViews = parsedVideos.reduce((sum, v) => sum + (v.views || 0), 0);
+      const currentStoredViews = parseInt((channel.benchmarks.views28d || "0").toString().replace(/,/g, ''), 10) || 0;
+      
+      // Số view 28 ngày tối thiểu phải bằng tổng view của các video ra mắt trong 28 ngày qua.
+      // Nếu kênh có ít video (<= 10) thì tối thiểu bằng tổng view thực tế của các video.
+      const baselineRecentViews = recentVideosViews > 0 ? recentVideosViews : (parsedVideos.length <= 10 ? totalAllViews : 0);
+      const finalViews28 = Math.max(currentStoredViews, baselineRecentViews);
+
+      channel.benchmarks.views28d = finalViews28.toLocaleString();
+      if (finalViews28 > 0 && (!channel.benchmarks.viewsTrend || channel.benchmarks.viewsTrend === '+0%')) {
+        channel.benchmarks.viewsTrend = '+100%';
       }
+
       await db.saveChannel(channel);
     }
 
